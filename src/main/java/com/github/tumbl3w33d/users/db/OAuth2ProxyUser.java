@@ -1,14 +1,7 @@
 package com.github.tumbl3w33d.users.db;
 
-import java.io.Serializable;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
+import com.github.tumbl3w33d.users.IncompleteOAuth2ProxyUserDataException;
+import com.github.tumbl3w33d.users.OAuth2ProxyUserManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.sonatype.nexus.common.entity.AbstractEntity;
@@ -17,8 +10,10 @@ import org.sonatype.nexus.security.role.RoleIdentifier;
 import org.sonatype.nexus.security.user.User;
 import org.sonatype.nexus.security.user.UserStatus;
 
-import com.github.tumbl3w33d.users.IncompleteOAuth2ProxyUserDataException;
-import com.github.tumbl3w33d.users.OAuth2ProxyUserManager;
+import java.io.Serializable;
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class OAuth2ProxyUser extends AbstractEntity implements Comparable<OAuth2ProxyUser>, Serializable, HasStringId {
 
@@ -61,8 +56,8 @@ public class OAuth2ProxyUser extends AbstractEntity implements Comparable<OAuth2
 
     public void setGroups(String groupString) {
         this.groups = Stream.of(groupString.split(","))
-                .map(group -> new RoleIdentifier(OAuth2ProxyUserManager.SOURCE, group))
-                .collect(Collectors.toSet());
+            .map(group -> new RoleIdentifier(OAuth2ProxyUserManager.SOURCE, group))
+            .collect(Collectors.toSet());
     }
 
     public void setGroups(Set<RoleIdentifier> groups) {
@@ -71,7 +66,7 @@ public class OAuth2ProxyUser extends AbstractEntity implements Comparable<OAuth2
 
     public String toString() {
         return String.format("OAuth2ProxyUser(%s) [email: %s | apiToken: %s]", preferred_username, email,
-                apiToken != null ? "<hidden>" : "null");
+            apiToken != null ? "<hidden>" : "null");
     }
 
     @Override
@@ -104,14 +99,14 @@ public class OAuth2ProxyUser extends AbstractEntity implements Comparable<OAuth2
             logger.debug("succeeded setting firstname {} and lastname {}", user.getFirstName(), user.getLastName());
         } else {
             throw new IncompleteOAuth2ProxyUserDataException(
-                    "preferredUsername missing or in unexpected format - " + getPreferredUsername());
+                "preferredUsername missing or in unexpected format - " + getPreferredUsername());
         }
 
         user.setSource(OAuth2ProxyUserManager.SOURCE);
         user.setStatus(UserStatus.active);
         user.addAllRoles(getGroups());
         logger.debug("set {} user {} active and added their groups as roles", OAuth2ProxyUserManager.SOURCE,
-                user.getUserId());
+            user.getUserId());
         return user;
     }
 
@@ -138,19 +133,44 @@ public class OAuth2ProxyUser extends AbstractEntity implements Comparable<OAuth2
         }
 
         // naive approach to figure out names from username
-        if (preferredUsername.contains(".")) {
-            String[] name_parts = preferredUsername.split("\\.");
-
-            try {
-                String assumed_firstname = name_parts[0].substring(0, 1).toUpperCase() + name_parts[0].substring(1);
-                ret[0] = assumed_firstname;
-                String assumed_lastname = name_parts[1].substring(0, 1).toUpperCase() + name_parts[1].substring(1);
-                ret[1] = assumed_lastname;
-                return Optional.of(ret);
-            } catch (IndexOutOfBoundsException e) {
+        if (preferredUsername.contains("@")) {
+            String[] parts = preferredUsername.split("@");
+            String usernamePart;
+            if (parts.length > 0) {
+                usernamePart = parts[0];
+            } else {
                 logger.debug("preferred username in unexpected format - " + preferredUsername);
+                return Optional.empty();
             }
+
+            if (usernamePart.contains(".")) {
+                String[] name_parts = preferredUsername.split("\\.");
+
+                try {
+                    String assumed_firstname = name_parts[0].substring(0, 1).toUpperCase() + name_parts[0].substring(1);
+                    ret[0] = assumed_firstname;
+                    String assumed_lastname = name_parts[1].substring(0, 1).toUpperCase() + name_parts[1].substring(1);
+                    ret[1] = assumed_lastname;
+                    return Optional.of(ret);
+                } catch (IndexOutOfBoundsException e) {
+                    logger.debug("preferred username in unexpected format - " + preferredUsername);
+                }
+            } else {
+                return Optional.of(new String[]{usernamePart, "PLACEHOLDER"});
+            }
+        } else {
+            String sep = "-";
+            if (preferredUsername.contains(".")) {
+                sep = "\\.";
+            }
+            if (preferredUsername.contains("_")) {
+                sep = "_";
+            }
+
+            String[] name_parts = preferredUsername.split(sep);
+            return Optional.of(new String[]{name_parts[0].toUpperCase(), name_parts[1].toUpperCase()});
         }
+
         return Optional.empty();
     }
 
@@ -166,9 +186,9 @@ public class OAuth2ProxyUser extends AbstractEntity implements Comparable<OAuth2
             return false;
         OAuth2ProxyUser other = (OAuth2ProxyUser) obj;
         return Objects.equals(preferred_username, other.preferred_username) &&
-                Objects.equals(groups, other.groups) &&
-                Objects.equals(email, other.email) &&
-                Objects.equals(apiToken, other.apiToken);
+            Objects.equals(groups, other.groups) &&
+            Objects.equals(email, other.email) &&
+            Objects.equals(apiToken, other.apiToken);
     }
 
     @Override
