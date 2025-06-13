@@ -20,6 +20,8 @@ public class OAuth2ProxyUser extends AbstractEntity implements Comparable<OAuth2
     private static final long serialVersionUID = 982589242389412L;
     private static final Logger logger = LoggerFactory.getLogger(OAuth2ProxyUser.class.getName());
 
+    private static final String NOT_AVAILABLE = "N/A";
+
     private String preferred_username;
     private String email;
     private String apiToken;
@@ -144,34 +146,24 @@ public class OAuth2ProxyUser extends AbstractEntity implements Comparable<OAuth2
             }
 
             if (usernamePart.contains(".")) {
-                String[] name_parts = preferredUsername.split("\\.");
-
-                try {
-                    String assumed_firstname = name_parts[0].substring(0, 1).toUpperCase() + name_parts[0].substring(1);
-                    ret[0] = assumed_firstname;
-                    String assumed_lastname = name_parts[1].substring(0, 1).toUpperCase() + name_parts[1].substring(1);
-                    ret[1] = assumed_lastname;
-                    return Optional.of(ret);
-                } catch (IndexOutOfBoundsException e) {
+                String[] nameParts = usernamePart.split("\\.");
+                if (nameParts.length < 2) {
                     logger.debug("preferred username in unexpected format - " + preferredUsername);
+                    return Optional.empty();
                 }
+
+                String assumed_firstname = nameParts[0].substring(0, 1).toUpperCase() + nameParts[0].substring(1);
+                ret[0] = assumed_firstname;
+                String assumed_lastname = nameParts[1].substring(0, 1).toUpperCase() + nameParts[1].substring(1);
+                ret[1] = assumed_lastname;
+
+                return Optional.of(ret);
             } else {
-                return Optional.of(new String[]{usernamePart, "PLACEHOLDER"});
+                return Optional.of(new String[]{usernamePart, NOT_AVAILABLE});
             }
         } else {
-            String sep = "-";
-            if (preferredUsername.contains(".")) {
-                sep = "\\.";
-            }
-            if (preferredUsername.contains("_")) {
-                sep = "_";
-            }
-
-            String[] name_parts = preferredUsername.split(sep);
-            return Optional.of(new String[]{name_parts[0].toUpperCase(), name_parts[1].toUpperCase()});
+            return Optional.of(new String[]{preferredUsername, NOT_AVAILABLE});
         }
-
-        return Optional.empty();
     }
 
     public String getGroupString() {
